@@ -11,15 +11,15 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 
 // Load SSL/TLS certificates
-const privateKey = fs.readFileSync('cert/key.pem', 'utf8');
-const certificate = fs.readFileSync('cert/cert.pem', 'utf8');
-const ca = fs.readFileSync('cert/csr.pem', 'utf8');
+// const privateKey = fs.readFileSync('cert/key.pem', 'utf8');
+// const certificate = fs.readFileSync('cert/cert.pem', 'utf8');
+// const ca = fs.readFileSync('cert/csr.pem', 'utf8');
 
-const credentials = {
-    key: privateKey,
-    cert: certificate,
-    ca: ca
-};
+// const credentials = {
+//     key: privateKey,
+//     cert: certificate,
+//     ca: ca
+// };
 
 app.use(bodyParser.json({ limit: '25mb' }));
 app.use(bodyParser.urlencoded({ limit: '25mb' }));
@@ -96,8 +96,8 @@ app.get('/initialize', async (req, res) => {
 });
 
 // Create HTTPS server
-const httpsServer = https.createServer(credentials, app);
+// const httpsServer = https.createServer(credentials, app);
 
-httpsServer.listen(port, () => {
-    console.log('Server is running on HTTPS...');
+app.listen(port, () => {
+    console.log('Server is running...');
 });
