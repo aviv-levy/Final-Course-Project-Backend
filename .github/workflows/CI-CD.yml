@@ -1,0 +1,91 @@
+# This is a basic workflow to help you get started with Actions
+
+name: FreeStyle Final Project CI-CD
+
+# Controls when the workflow will run
+on:
+  #push:
+    #branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'Prod'
+        type: choice
+        options:
+          - Prod
+          
+env:
+  AWS_REGION: "eu-west-1"
+  ECR_REPOSITORY: "freestyle"
+  APP_NAME: "freestyle-api"
+  #SPLUNK_URL: ${{ secrets.SPLUNK_URL }}
+  #SPLUNK_TOKEN: ${{ secrets.SPLUNK_TOKEN }}
+  #SPLUNK_INDEX: ${{ secrets.SPLUNK_INDEX }}
+  #ENVIRONMENT: splunk
+
+permissions:
+  id-token: write
+  contents: read
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    name: 🎯 Build Image on runner
+
+    outputs:
+      image_tag: ${{ steps.generate-tag.outputs.UNIQUE_TAG }}
+      ecr_registry: ${{ steps.login-ecr.outputs.registry }}
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Checkout repository 📂
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials 🔐
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::017923816312:role/role-global-cicd
+          #role-session-name: GitHub_to_AWS_via_FederatedOIDC
+
+      - name: Login to Amazon ECR 🔑
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create .env file from secrets
+        run: |
+          echo "🔧 Creating environment file..."
+          echo "${{ secrets.ENV }}" > .env
+          echo "✅ Environment file created successfully!"
+
+      - name: Generate Tag
+        id: generate-tag
+        run: |
+          BUILD_NUMBER=${{ github.run_number }}
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          echo "UNIQUE_TAG="${{env.APP_NAME}}"-${BUILD_NUMBER}-${TIMESTAMP}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image 🏗️
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          UNIQUE_TAG: ${{ steps.generate-tag.outputs.UNIQUE_TAG }}
+        run: |
+          echo "🔨 Starting Docker build..."
+          echo "🔍 Build triggered by: ${{ github.event_name }}"
+          
+          # Build Docker image
+          docker build \
+            --build-arg ENVIRONMENT=$ENVIRONMENT \
+            -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$UNIQUE_TAG \
+            .
+
+          # Push to ECR
+          echo "⬆️ Pushing image to ECR..."
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$UNIQUE_TAG
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Image pushed successfully with tag: $UNIQUE_TAG"
