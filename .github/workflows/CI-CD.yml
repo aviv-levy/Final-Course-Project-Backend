@@ -48,7 +48,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::017923816312:role/role-global-cicd
+          role-to-assume: arn:aws:iam::017923816312:role/GithubActionsAvivLevyDeployRole
           #role-session-name: GitHub_to_AWS_via_FederatedOIDC
 
       - name: Login to Amazon ECR 🔑
