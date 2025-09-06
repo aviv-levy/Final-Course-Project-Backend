@@ -1,6 +1,5 @@
 name: FreeStyle Final Project CI-CD
 
-# Controls when the workflow will run
 on:
   #push:
     #branches: [main]
@@ -13,7 +12,7 @@ on:
         type: choice
         options:
           - Prod
-          
+
 env:
   AWS_REGION: "eu-west-1"
   ECR_REPOSITORY: "freestyle"
@@ -32,23 +31,21 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    name: 🎯 Build Image on runner
+    name: "🎯 Build Image on runner"
 
     outputs:
       image_tag: ${{ steps.generate-tag.outputs.UNIQUE_TAG }}
       ecr_registry: ${{ steps.login-ecr.outputs.registry }}
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       - name: Checkout repository 📂
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials 🔐
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::017923816312:role/GithubActionsAvivLevyDeployRole
-          #role-session-name: GitHub_to_AWS_via_FederatedOIDC
 
       - name: Login to Amazon ECR 🔑
         id: login-ecr
@@ -65,7 +62,7 @@ jobs:
         run: |
           BUILD_NUMBER=${{ github.run_number }}
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          echo "UNIQUE_TAG="${{env.APP_NAME}}"-${BUILD_NUMBER}-${TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo "UNIQUE_TAG=${{ env.APP_NAME }}-${BUILD_NUMBER}-${TIMESTAMP}" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image 🏗️
         id: build-image
@@ -75,25 +72,15 @@ jobs:
         run: |
           echo "🔨 Starting Docker build..."
           echo "🔍 Build triggered by: ${{ github.event_name }}"
-          
-          # Build Docker image
-          docker build \
-            --build-arg ENVIRONMENT=$ENVIRONMENT \
-            -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$UNIQUE_TAG \
-            .
-
-          # Push to ECR
+          docker build             -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$UNIQUE_TAG             .
           echo "⬆️ Pushing image to ECR..."
           docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$UNIQUE_TAG
-          
-          if [ $? -eq 0 ]; then
-            echo "✅ Image pushed successfully with tag: $UNIQUE_TAG"
-          fi
+          echo "✅ Image pushed successfully with tag: $UNIQUE_TAG"
 
 # Deploy image to eks
   Deploy-to-eks:
     runs-on: ubuntu-latest
-    name: 🎯 Deploy image to eks
+    name: "🎯 Deploy image to eks"
     needs: build-and-push
 
     steps:
@@ -101,15 +88,12 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::017923816312:role/GithubActionsAvivLevyDeployRole 
+          role-to-assume: arn:aws:iam::017923816312:role/GithubActionsAvivLevyDeployRole
 
       - name: Setup kubectl & auth to EKS 🧩
         run: |
-            aws eks update-kubeconfig \
-              --name "$EKS_CLUSTER_NAME" \
-              --region "$AWS_REGION"
-            kubectl version --client=true
-
+          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+          kubectl version --client=true
 
       - name: Ensure namespace exists 🧱
         run: |
@@ -118,7 +102,7 @@ jobs:
 # Deployment file configuration
       - name: Render Kubernetes manifests 📄
         env:
-         IMAGE: ${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build-and-push.outputs.image_tag }}
+          IMAGE: ${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build-and-push.outputs.image_tag }}
         run: |
           cat > k8s.yaml <<EOF
           apiVersion: apps/v1
@@ -156,29 +140,24 @@ jobs:
                         memory: "512Mi"
           ---
           apiVersion: v1
-            kind: Service
-            metadata:
-              name: ${APP_NAME}
-              namespace: ${EKS_NAMESPACE}
-              labels:
-                app: ${APP_NAME}
-            spec:
-              type: LoadBalancer   # change to ClusterIP/NodePort if desired
-              selector:
-                app: ${APP_NAME}
-              ports:
-                - name: http
-                  port: 80
-                  targetPort: 4500
+          kind: Service
+          metadata:
+            name: ${APP_NAME}
+            namespace: ${EKS_NAMESPACE}
+            labels:
+              app: ${APP_NAME}
+          spec:
+            type: LoadBalancer
+            selector:
+              app: ${APP_NAME}
+            ports:
+              - name: http
+                port: 80
+                targetPort: 4500
           EOF
-          
-            if [ -f .env ]; then
-            kubectl create secret generic "${APP_NAME}-env" \
-              --namespace "${EKS_NAMESPACE}" \
-              --from-env-file=.env \
-              --dry-run=client -o yaml | kubectl apply -f -
-            fi
-  
+          if [ -f .env ]; then
+            kubectl create secret generic "${APP_NAME}-env"               --namespace "${EKS_NAMESPACE}"               --from-env-file=.env               --dry-run=client -o yaml | kubectl apply -f -
+          fi
 
 
 # apply the deploy
@@ -186,15 +165,15 @@ jobs:
         run: |
           kubectl apply -f k8s.yaml
 
-
       - name: Wait for rollout ⏱️
         run: |
           kubectl rollout status deploy/${APP_NAME} -n ${EKS_NAMESPACE} --timeout=300s
-          echo ""
           echo "Deployed image:"
-          echo "  $ECR_REGISTRY/${ECR_REPOSITORY}:${IMAGE_TAG}"          
-
+          echo "${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build-and-push.outputs.image_tag }}"
 
       - name: Show service endpoint 🌐
         run: |
           kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o wide
+          echo -n "LB hostname: "
+          kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true
+          echo
