@@ -18,7 +18,7 @@ env:
   AWS_REGION: "eu-west-1"
   ECR_REPOSITORY: "freestyle"
   APP_NAME: "freestyle-api"
-  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+  EKS_CLUSTER_NAME: "freestyle"
   EKS_NAMESPACE: ${{ secrets.EKS_NAMESPACE || 'freestyle' }}
   #SPLUNK_URL: ${{ secrets.SPLUNK_URL }}
   #SPLUNK_TOKEN: ${{ secrets.SPLUNK_TOKEN }}
