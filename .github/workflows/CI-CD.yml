@@ -1,5 +1,3 @@
-# This is a basic workflow to help you get started with Actions
-
 name: FreeStyle Final Project CI-CD
 
 # Controls when the workflow will run
@@ -20,6 +18,8 @@ env:
   AWS_REGION: "eu-west-1"
   ECR_REPOSITORY: "freestyle"
   APP_NAME: "freestyle-api"
+  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+  EKS_NAMESPACE: ${{ secrets.EKS_NAMESPACE || 'freestyle' }}
   #SPLUNK_URL: ${{ secrets.SPLUNK_URL }}
   #SPLUNK_TOKEN: ${{ secrets.SPLUNK_TOKEN }}
   #SPLUNK_INDEX: ${{ secrets.SPLUNK_INDEX }}
@@ -29,7 +29,6 @@ permissions:
   id-token: write
   contents: read
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
@@ -89,3 +88,107 @@ jobs:
           
           if [ $? -eq 0 ]; then
             echo "✅ Image pushed successfully with tag: $UNIQUE_TAG"
+          fi
+
+# Deploy image to eks
+  Deploy-to-eks:
+    runs-on: ubuntu-latest
+    name: 🎯 Deploy image to eks
+    needs: build-and-push
+
+    steps:
+      - name: Configure AWS credentials 🔐
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::017923816312:role/GithubActionsAvivLevyDeployRole 
+
+      - name: Setup kubectl & auth to EKS 🧩
+        run: |
+            aws eks update-kubeconfig \
+              --name "$EKS_CLUSTER_NAME" \
+              --region "$AWS_REGION"
+            kubectl version --client=true
+
+
+      - name: Ensure namespace exists 🧱
+        run: |
+          kubectl get ns "$EKS_NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$EKS_NAMESPACE"
+
+# Deployment file configuration
+      - name: Render Kubernetes manifests 📄
+        env:
+         IMAGE: ${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build-and-push.outputs.image_tag }}
+        run: |
+            cat > k8s.yaml <<EOF
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: ${APP_NAME}
+              namespace: ${EKS_NAMESPACE}
+              labels:
+                app: ${APP_NAME}
+            spec:
+              replicas: 2
+              selector:
+                matchLabels:
+                  app: ${APP_NAME}
+              template:
+                metadata:
+                  labels:
+                    app: ${APP_NAME}
+                spec:
+                  containers:
+                    - name: ${APP_NAME}
+                      image: ${IMAGE}
+                      imagePullPolicy: IfNotPresent
+                      ports:
+                        - containerPort: 8080
+                      envFrom:
+                        - secretRef:
+                            name: ${APP_NAME}-env
+                      resources:
+                        requests:
+                          cpu: "100m"
+                          memory: "128Mi"
+                        limits:
+                          cpu: "500m"
+                          memory: "512Mi"
+                  # If your nodes need ECR creds, EKS + IRSA handles this automatically.
+            # ---
+            # apiVersion: v1
+            # kind: Service
+            # metadata:
+            #   name: ${APP_NAME}
+            #   namespace: ${EKS_NAMESPACE}
+            #   labels:
+            #     app: ${APP_NAME}
+            # spec:
+            #   type: LoadBalancer   # change to ClusterIP/NodePort if desired
+            #   selector:
+            #     app: ${APP_NAME}
+            #   ports:
+            #     - name: http
+            #       port: 80
+            #       targetPort: 8080
+            EOF
+  
+
+
+# apply the deploy
+      - name: Apply manifests 🚀
+        run: |
+          kubectl apply -f k8s.yaml
+
+
+      - name: Wait for rollout ⏱️
+        run: |
+          kubectl rollout status deploy/${APP_NAME} -n ${EKS_NAMESPACE} --timeout=300s
+          echo ""
+          echo "Deployed image:"
+          echo "  $ECR_REGISTRY/${ECR_REPOSITORY}:${IMAGE_TAG}"          
+
+
+      - name: Show service endpoint 🌐
+        run: |
+          kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o wide
