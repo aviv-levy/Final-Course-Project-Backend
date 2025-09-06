@@ -155,22 +155,22 @@ jobs:
                           cpu: "500m"
                           memory: "512Mi"
                   # If your nodes need ECR creds, EKS + IRSA handles this automatically.
-            # ---
-            # apiVersion: v1
-            # kind: Service
-            # metadata:
-            #   name: ${APP_NAME}
-            #   namespace: ${EKS_NAMESPACE}
-            #   labels:
-            #     app: ${APP_NAME}
-            # spec:
-            #   type: LoadBalancer   # change to ClusterIP/NodePort if desired
-            #   selector:
-            #     app: ${APP_NAME}
-            #   ports:
-            #     - name: http
-            #       port: 80
-            #       targetPort: 8080
+             ---
+             apiVersion: v1
+             kind: Service
+             metadata:
+               name: ${APP_NAME}
+               namespace: ${EKS_NAMESPACE}
+               labels:
+                 app: ${APP_NAME}
+             spec:
+               type: LoadBalancer   # change to ClusterIP/NodePort if desired
+               selector:
+                 app: ${APP_NAME}
+               ports:
+                 - name: http
+                   port: 80
+                   targetPort: 4500
             EOF
             if [ -f .env ]; then
             kubectl create secret generic "${APP_NAME}-env" \
