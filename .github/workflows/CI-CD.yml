@@ -143,7 +143,7 @@ jobs:
                       image: ${IMAGE}
                       imagePullPolicy: IfNotPresent
                       ports:
-                        - containerPort: 8080
+                        - containerPort: 4500
                       envFrom:
                         - secretRef:
                             name: ${APP_NAME}-env
@@ -172,6 +172,12 @@ jobs:
             #       port: 80
             #       targetPort: 8080
             EOF
+            if [ -f .env ]; then
+            kubectl create secret generic "${APP_NAME}-env" \
+              --namespace "${EKS_NAMESPACE}" \
+              --from-env-file=.env \
+              --dry-run=client -o yaml | kubectl apply -f -
+            fi
   
 
 
