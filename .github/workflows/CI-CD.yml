@@ -120,58 +120,58 @@ jobs:
         env:
          IMAGE: ${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build-and-push.outputs.image_tag }}
         run: |
-            cat > k8s.yaml <<EOF
-            apiVersion: apps/v1
-            kind: Deployment
+          cat > k8s.yaml <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: ${APP_NAME}
+            namespace: ${EKS_NAMESPACE}
+            labels:
+              app: ${APP_NAME}
+          spec:
+            replicas: 2
+            selector:
+              matchLabels:
+                app: ${APP_NAME}
+            template:
+              metadata:
+                labels:
+                  app: ${APP_NAME}
+              spec:
+                containers:
+                  - name: ${APP_NAME}
+                    image: ${IMAGE}
+                    imagePullPolicy: IfNotPresent
+                    ports:
+                      - containerPort: 4500
+                    envFrom:
+                      - secretRef:
+                          name: ${APP_NAME}-env
+                    resources:
+                      requests:
+                        cpu: "100m"
+                        memory: "128Mi"
+                      limits:
+                        cpu: "500m"
+                        memory: "512Mi"
+          ---
+          apiVersion: v1
+            kind: Service
             metadata:
               name: ${APP_NAME}
               namespace: ${EKS_NAMESPACE}
               labels:
                 app: ${APP_NAME}
             spec:
-              replicas: 2
+              type: LoadBalancer   # change to ClusterIP/NodePort if desired
               selector:
-                matchLabels:
-                  app: ${APP_NAME}
-              template:
-                metadata:
-                  labels:
-                    app: ${APP_NAME}
-                spec:
-                  containers:
-                    - name: ${APP_NAME}
-                      image: ${IMAGE}
-                      imagePullPolicy: IfNotPresent
-                      ports:
-                        - containerPort: 4500
-                      envFrom:
-                        - secretRef:
-                            name: ${APP_NAME}-env
-                      resources:
-                        requests:
-                          cpu: "100m"
-                          memory: "128Mi"
-                        limits:
-                          cpu: "500m"
-                          memory: "512Mi"
-                  # If your nodes need ECR creds, EKS + IRSA handles this automatically.
-             ---
-             apiVersion: v1
-             kind: Service
-             metadata:
-               name: ${APP_NAME}
-               namespace: ${EKS_NAMESPACE}
-               labels:
-                 app: ${APP_NAME}
-             spec:
-               type: LoadBalancer   # change to ClusterIP/NodePort if desired
-               selector:
-                 app: ${APP_NAME}
-               ports:
-                 - name: http
-                   port: 80
-                   targetPort: 4500
-            EOF
+                app: ${APP_NAME}
+              ports:
+                - name: http
+                  port: 80
+                  targetPort: 4500
+          EOF
+          
             if [ -f .env ]; then
             kubectl create secret generic "${APP_NAME}-env" \
               --namespace "${EKS_NAMESPACE}" \
