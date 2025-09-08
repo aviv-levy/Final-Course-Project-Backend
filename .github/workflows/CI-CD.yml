@@ -125,7 +125,7 @@ jobs:
                 containers:
                   - name: ${APP_NAME}
                     image: ${IMAGE}
-                    imagePullPolicy: IfNotPresent
+                    imagePullPolicy: Always
                     ports:
                       - containerPort: 4500
                     envFrom:
@@ -155,9 +155,12 @@ jobs:
                 port: 80
                 targetPort: 4500
           EOF
-          if [ -f .env ]; then
-            kubectl create secret generic "${APP_NAME}-env"               --namespace "${EKS_NAMESPACE}"               --from-env-file=.env               --dry-run=client -o yaml | kubectl apply -f -
-          fi
+
+
+          kubectl create secret generic "${APP_NAME}-env" \
+            --namespace "${EKS_NAMESPACE}" \
+            --from-env-file=.env \
+            --dry-run=client -o yaml | kubectl apply -f -
 
 
 # apply the deploy
@@ -177,4 +180,16 @@ jobs:
           echo -n "LB hostname: "
           kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true
           echo
-#comment
+
+      - name: Diagnostics on failure 🧪
+        if: failure()
+        run: |
+            echo "=== Pods ==="
+            kubectl get pods -n ${EKS_NAMESPACE} -o wide
+            echo "=== Describe deployment ==="
+            kubectl describe deploy/${APP_NAME} -n ${EKS_NAMESPACE} || true
+            echo "=== Events ==="
+            kubectl get events -n ${EKS_NAMESPACE} --sort-by=.lastTimestamp | tail -n 100 || true
+            echo "=== Pod logs (first pod) ==="
+            P=$(kubectl get pods -n ${EKS_NAMESPACE} -l app=${APP_NAME} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+            if [ -n "$P" ]; then kubectl logs -n ${EKS_NAMESPACE} "$P" --tail=200 || true; fi
