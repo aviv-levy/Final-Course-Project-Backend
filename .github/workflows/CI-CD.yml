@@ -154,12 +154,6 @@ jobs:
           EOF
 
 
-          kubectl create secret generic "${APP_NAME}-env" \
-            --namespace "${EKS_NAMESPACE}" \
-            --from-env-file=.env \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-
 # apply the deploy
       - name: Apply manifests 🚀
         run: |
