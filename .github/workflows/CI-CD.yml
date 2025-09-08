@@ -177,3 +177,4 @@ jobs:
           echo -n "LB hostname: "
           kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true
           echo
+#comment
