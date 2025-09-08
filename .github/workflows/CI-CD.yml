@@ -128,9 +128,6 @@ jobs:
                     imagePullPolicy: Always
                     ports:
                       - containerPort: 4500
-                    envFrom:
-                      - secretRef:
-                          name: ${APP_NAME}-env
                     resources:
                       requests:
                         cpu: "100m"
