@@ -145,13 +145,14 @@ jobs:
             labels:
               app: ${APP_NAME}
           spec:
-            type: LoadBalancer
+            type: NodePort
             selector:
               app: ${APP_NAME}
             ports:
               - name: http
                 port: 80
                 targetPort: 4500
+                nodePort: 31159
           EOF
 
 
