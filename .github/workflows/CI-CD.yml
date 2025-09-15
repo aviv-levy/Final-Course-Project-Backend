@@ -144,10 +144,6 @@ jobs:
             namespace: ${EKS_NAMESPACE}
             labels:
               app: ${APP_NAME}
-            annotations:
-              service.beta.kubernetes.io/aws-load-balancer-type: "external"
-              service.beta.kubernetes.io/aws-load-balancer-name: "${APP_NAME}-nlb"
-              external-dns.alpha.kubernetes.io/hostname: "api.freestyle.com."
           spec:
             type: LoadBalancer
             selector:
