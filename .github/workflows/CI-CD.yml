@@ -144,15 +144,18 @@ jobs:
             namespace: ${EKS_NAMESPACE}
             labels:
               app: ${APP_NAME}
+            annotations:
+              service.beta.kubernetes.io/aws-load-balancer-type: "external"
+              service.beta.kubernetes.io/aws-load-balancer-name: "${APP_NAME}-nlb"
+              external-dns.alpha.kubernetes.io/hostname: "api.freestyle.com."
           spec:
-            type: NodePort
+            type: LoadBalancer
             selector:
               app: ${APP_NAME}
             ports:
               - name: http
                 port: 80
                 targetPort: 4500
-                nodePort: 31159
           EOF
 
 
