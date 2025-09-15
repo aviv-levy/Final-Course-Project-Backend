@@ -34,7 +34,7 @@ router.post('/', async (req, res) => {
         if (await bcrypt.compare(password, user.password.toString())) {
             user.password = undefined;
             user.blockTime = undefined;
-            res.json({
+            res.status(201).json({
                 token: jwt.sign({ id: user.id, email: email, isAdmin: user.isAdmin }, process.env.SECRET, { expiresIn: '24h' }),
                 userDetails: user,
             });
