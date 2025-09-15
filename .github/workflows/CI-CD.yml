@@ -145,7 +145,7 @@ jobs:
             labels:
               app: ${APP_NAME}
           spec:
-            type: NodPort
+            type: NodePort
             selector:
               app: ${APP_NAME}
             ports:
