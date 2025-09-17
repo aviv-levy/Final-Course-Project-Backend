@@ -185,3 +185,92 @@ jobs:
             echo "=== Pod logs (first pod) ==="
             P=$(kubectl get pods -n ${EKS_NAMESPACE} -l app=${APP_NAME} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
             if [ -n "$P" ]; then kubectl logs -n ${EKS_NAMESPACE} "$P" --tail=200 || true; fi
+
+            
+  test-login-api:
+    runs-on: ubuntu-latest
+    name: "🧪 Run login API tests"
+    needs: Deploy-to-eks
+    steps:
+      - name: Checkout repository 📂
+        uses: actions/checkout@v4
+
+      - name: Wait for service to be ready ⏱️
+        run: |
+          # Wait for LoadBalancer hostname to appear
+          for i in {1..15}; do
+            LB=$(kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [ -n "$LB" ]; then break; fi
+            echo "Waiting for LoadBalancer..."
+            sleep 10
+          done
+          if [ -z "$LB" ]; then
+            echo "Fail: LoadBalancer hostname not available"
+            exit 1
+          fi
+          echo "Service available at: $LB"
+          echo "SERVER_URL=http://$LB/login" >> $GITHUB_ENV
+
+      - name: Run API tests 📝
+        run: |
+          serverUrl="${SERVER_URL}"
+
+          echo "** Test 1: Correct login **"
+          response=$(curl -s -X POST $serverUrl \
+          -H "Content-Type: application/json" \
+          -d "${{ secrets.MONGO_TEST_USER }}")
+          if echo "$response" | jq empty 2>/dev/null; then
+            token=$(echo "$response" | jq -r ".token")
+            if [ "$token" != "null" ] && [ -n "$token" ]; then
+              echo "Ok: User successfully logged-in"
+            else
+              error_msg=$(echo "$response" | jq -r '.message // empty')
+              if [ -n "$error_msg" ]; then
+                echo "Fail: $error_msg"
+              else
+                echo "Fail: unexpected response"
+              fi
+            fi
+          else
+            echo "Fail: $response"
+          fi
+
+          echo "** Test 2: Wrong login **"
+          response=$(curl -s -X POST $serverUrl \
+          -H "Content-Type: application/json" \
+          -d '{"email": "wrong@gmail.com", "password": "Abc@12345"}')
+          if echo "$response" | jq empty 2>/dev/null; then
+            token=$(echo "$response" | jq -r ".token")
+            if [ "$token" != "null" ] && [ -n "$token" ]; then
+              echo "Fail: Wrong login have a token"
+            else
+              error_msg=$(echo "$response" | jq -r '.message // empty')
+              if [ -n "$error_msg" ]; then
+                echo "Ok: $error_msg"
+              else
+                echo "Ok: unexpected response"
+              fi
+            fi
+          else
+            echo "Ok: $response"
+          fi
+
+          echo "** Test 3: Wrong Password **"
+          response=$(curl -s -X POST $serverUrl \
+          -H "Content-Type: application/json" \
+          -d '{"email": "nir@gmail.com", "password": "Abc@12345"}')
+          if echo "$response" | jq empty 2>/dev/null; then
+            token=$(echo "$response" | jq -r ".token")
+            if [ "$token" != "null" ] && [ -n "$token" ]; then
+              echo "Fail: Wrong password have a token"
+            else
+              error_msg=$(echo "$response" | jq -r ".message // empty")
+              if [ -n "$error_msg" ]; then
+                echo "Ok: $error_msg"
+              else
+                echo "Ok: unexpected response"
+              fi
+            fi
+          else
+            echo "Ok: $response"
+          fi
