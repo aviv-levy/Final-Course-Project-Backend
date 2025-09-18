@@ -84,7 +84,7 @@ jobs:
           echo "⏳ Waiting for MongoDB service..."
 
           for i in $(seq 1 $MAX_RETRIES); do
-            if nc -z mongo 27017; then
+            if nc -z localhost 27017; then
               echo "✅ MongoDB port is open!"
               break
             fi
