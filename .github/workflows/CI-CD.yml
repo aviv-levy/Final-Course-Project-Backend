@@ -34,6 +34,17 @@ jobs:
     environment: ENV
     name: "🎯 Build Image on runner"
 
+    services:
+      mongo:
+        image: mongo:6
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     outputs:
       image_tag: ${{ steps.generate-tag.outputs.UNIQUE_TAG }}
       ecr_registry: ${{ steps.login-ecr.outputs.registry }}
@@ -41,6 +52,14 @@ jobs:
     steps:
       - name: Checkout repository 📂
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
 
       - name: Configure AWS credentials 🔐
         uses: aws-actions/configure-aws-credentials@v4
@@ -58,6 +77,108 @@ jobs:
           echo "${{ secrets.AWS_PRODUCTION }}" > .env
           echo "✅ Environment file created successfully!"
 
+      - name: Wait for Mongo to be ready ⏱️
+        run: |
+          MAX_RETRIES=10
+          RETRY_INTERVAL=2
+          echo "⏳ Waiting for MongoDB service..."
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            if mongosh --host localhost --eval 'db.adminCommand("ping")' >/dev/null 2>&1; then
+              echo "✅ MongoDB is ready!"
+              break
+            fi
+            echo "Waiting for MongoDB..."
+            sleep $RETRY_INTERVAL
+            if [ "$i" -eq "$MAX_RETRIES" ]; then
+              echo "❌ MongoDB failed to start after $((MAX_RETRIES*RETRY_INTERVAL)) seconds"
+              exit 1
+            fi
+          done
+
+      - name: Start app in background 🚀
+        run: |
+          node server.js &
+          sleep 2
+
+      - name: Wait for app to be ready ⏱️
+        run: |
+          for i in {1..15}; do
+            if curl -s http://localhost:4500/test >/dev/null 2>&1; then
+              echo "✅ App is ready!"
+              exit 0
+            fi
+            echo "⏳ Waiting for app..."
+            sleep 2
+          done
+          echo "❌ App failed to start"
+          exit 1
+
+      - name: Initialize local DB 🚀
+        run: |
+          curl http://localhost:4500/initialize
+          sleep 1
+
+          
+      - name: Run login API tests 📝
+        run: |
+          localUrl="http://localhost:4500/login"
+
+          echo "** Test 1: Correct login **"
+          response=$(curl -s -X POST $localUrl \
+          -H "Content-Type: application/json" \
+          -d "${{ secrets.MONGO_TEST_USER }}")
+          if echo "$response" | jq empty 2>/dev/null; then
+            token=$(echo "$response" | jq -r ".token")
+            if [ "$token" != "null" ] && [ -n "$token" ]; then
+              echo "Ok: User successfully logged-in"
+            else
+              error_msg=$(echo "$response" | jq -r '.message // empty')
+              if [ -n "$error_msg" ]; then
+                echo "Fail: $error_msg"
+                exit 1
+              else
+                echo "Fail: unexpected response"
+                exit 1
+              fi
+            fi
+          else
+            echo "Fail: $response"
+            exit 1
+          fi
+
+          echo "** Test 2: Wrong login **"
+          response=$(curl -s -X POST $localUrl \
+          -H "Content-Type: application/json" \
+          -d '{"email": "wrong@gmail.com", "password": "Abc@12345"}')
+          if echo "$response" | jq empty 2>/dev/null; then
+            token=$(echo "$response" | jq -r ".token")
+            if [ "$token" != "null" ] && [ -n "$token" ]; then
+              echo "Fail: Wrong login have a token"
+              exit 1
+            else
+              echo "Ok: $(echo "$response" | jq -r '.message // "unexpected response"')"
+            fi
+          else
+            echo "Ok: $response"
+          fi
+
+          echo "** Test 3: Wrong Password **"
+          response=$(curl -s -X POST $localUrl \
+          -H "Content-Type: application/json" \
+          -d '{"email": "nir@gmail.com", "password": "Abc@12345"}')
+          if echo "$response" | jq empty 2>/dev/null; then
+            token=$(echo "$response" | jq -r ".token")
+            if [ "$token" != "null" ] && [ -n "$token" ]; then
+              echo "Fail: Wrong password have a token"
+              exit 1
+            else
+              echo "Ok: $(echo "$response" | jq -r '.message // "unexpected response"')"
+            fi
+          else
+            echo "Ok: $response"
+          fi
+
       - name: Generate Tag
         id: generate-tag
         run: |
@@ -70,6 +191,8 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           UNIQUE_TAG: ${{ steps.generate-tag.outputs.UNIQUE_TAG }}
+
+      
         run: |
           echo "🔨 Starting Docker build..."
           echo "🔍 Build triggered by: ${{ github.event_name }}"
@@ -187,14 +310,11 @@ jobs:
             if [ -n "$P" ]; then kubectl logs -n ${EKS_NAMESPACE} "$P" --tail=200 || true; fi
 
             
-  test-login-api:
+  test-lb:
     runs-on: ubuntu-latest
-    name: "🧪 Run login API tests"
+    name: "Check if LB is ready"
     needs: Deploy-to-eks
     steps:
-      - name: Checkout repository 📂
-        uses: actions/checkout@v4
-
       - name: Wait for service to be ready ⏱️
         run: |
           # Wait for LoadBalancer hostname to appear
@@ -209,68 +329,4 @@ jobs:
             exit 1
           fi
           echo "Service available at: $LB"
-          echo "SERVER_URL=http://$LB/login" >> $GITHUB_ENV
-
-      - name: Run API tests 📝
-        run: |
-          serverUrl="${SERVER_URL}"
-
-          echo "** Test 1: Correct login **"
-          response=$(curl -s -X POST $serverUrl \
-          -H "Content-Type: application/json" \
-          -d "${{ secrets.MONGO_TEST_USER }}")
-          if echo "$response" | jq empty 2>/dev/null; then
-            token=$(echo "$response" | jq -r ".token")
-            if [ "$token" != "null" ] && [ -n "$token" ]; then
-              echo "Ok: User successfully logged-in"
-            else
-              error_msg=$(echo "$response" | jq -r '.message // empty')
-              if [ -n "$error_msg" ]; then
-                echo "Fail: $error_msg"
-              else
-                echo "Fail: unexpected response"
-              fi
-            fi
-          else
-            echo "Fail: $response"
-          fi
-
-          echo "** Test 2: Wrong login **"
-          response=$(curl -s -X POST $serverUrl \
-          -H "Content-Type: application/json" \
-          -d '{"email": "wrong@gmail.com", "password": "Abc@12345"}')
-          if echo "$response" | jq empty 2>/dev/null; then
-            token=$(echo "$response" | jq -r ".token")
-            if [ "$token" != "null" ] && [ -n "$token" ]; then
-              echo "Fail: Wrong login have a token"
-            else
-              error_msg=$(echo "$response" | jq -r '.message // empty')
-              if [ -n "$error_msg" ]; then
-                echo "Ok: $error_msg"
-              else
-                echo "Ok: unexpected response"
-              fi
-            fi
-          else
-            echo "Ok: $response"
-          fi
-
-          echo "** Test 3: Wrong Password **"
-          response=$(curl -s -X POST $serverUrl \
-          -H "Content-Type: application/json" \
-          -d '{"email": "nir@gmail.com", "password": "Abc@12345"}')
-          if echo "$response" | jq empty 2>/dev/null; then
-            token=$(echo "$response" | jq -r ".token")
-            if [ "$token" != "null" ] && [ -n "$token" ]; then
-              echo "Fail: Wrong password have a token"
-            else
-              error_msg=$(echo "$response" | jq -r ".message // empty")
-              if [ -n "$error_msg" ]; then
-                echo "Ok: $error_msg"
-              else
-                echo "Ok: unexpected response"
-              fi
-            fi
-          else
-            echo "Ok: $response"
-          fi
+        
