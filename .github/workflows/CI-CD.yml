@@ -127,7 +127,7 @@ jobs:
           echo "** Test 1: Correct login **"
           response=$(curl -s -X POST $localUrl \
           -H "Content-Type: application/json" \
-          -d '${{ secrets.MONGO_TEST_USER }}')
+          -d '{"email": "test@gmail.com", "password": "Abc@12345"}')
           if echo "$response" | jq empty 2>/dev/null; then
             token=$(echo "$response" | jq -r ".token")
             if [ "$token" != "null" ] && [ -n "$token" ]; then
