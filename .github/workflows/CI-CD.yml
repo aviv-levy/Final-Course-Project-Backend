@@ -289,12 +289,6 @@ jobs:
           echo "Deployed image:"
           echo "${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build-and-push.outputs.image_tag }}"
 
-      - name: Show service endpoint 🌐
-        run: |
-          kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o wide
-          echo -n "LB hostname: "
-          kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true
-          echo
 
       - name: Diagnostics on failure 🧪
         if: failure()
@@ -309,17 +303,12 @@ jobs:
             P=$(kubectl get pods -n ${EKS_NAMESPACE} -l app=${APP_NAME} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
             if [ -n "$P" ]; then kubectl logs -n ${EKS_NAMESPACE} "$P" --tail=200 || true; fi
 
-            
-  test-lb:
-    runs-on: ubuntu-latest
-    name: "Check if LB is ready"
-    needs: Deploy-to-eks
-    steps:
-      - name: Wait for service to be ready ⏱️
+
+      - name: Wait for LoadBalancer to be ready ⏱️
         run: |
-          # Wait for LoadBalancer hostname to appear
+          echo "Checking if LoadBalancer is ready..."
           for i in {1..15}; do
-            LB=$(kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            LB=$(kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true)
             if [ -n "$LB" ]; then break; fi
             echo "Waiting for LoadBalancer..."
             sleep 10
@@ -328,5 +317,14 @@ jobs:
             echo "Fail: LoadBalancer hostname not available"
             exit 1
           fi
-          echo "Service available at: $LB"
-        
+         
+
+      - name: Show service endpoint 🌐
+        run: |
+          kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o wide
+          echo -n "LB hostname: "
+          kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true
+          echo
+
+
+            
