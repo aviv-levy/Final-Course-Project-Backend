@@ -124,10 +124,28 @@ jobs:
         run: |
           localUrl="http://localhost:4500/login"
 
-          echo "** Test 1: Correct login **"
+
+          echo "** Test 2: Wrong login **"
           response=$(curl -s -X POST $localUrl \
           -H "Content-Type: application/json" \
-          -d '{"email": "test@gmail.com", "password": "Abc@12345"}')
+          -d '{"email": "wrong@gmail.com", "password": "Abc@12345"}')
+          if echo "$response" | jq empty 2>/dev/null; then
+            token=$(echo "$response" | jq -r ".token")
+            if [ "$token" != "null" ] && [ -n "$token" ]; then
+              echo "Fail: Wrong login have a token"
+              exit 1
+            else
+              echo "Ok: $(echo "$response" | jq -r '.message // "unexpected response"')"
+            fi
+          else
+            echo "Ok: $response"
+          fi
+
+
+           echo "** Test 1: Correct login **"
+          response=$(curl -s -X POST $localUrl \
+          -H "Content-Type: application/json" \
+          -d '{{ secrets.AWS_TEST_USER }}')
           if echo "$response" | jq empty 2>/dev/null; then
             token=$(echo "$response" | jq -r ".token")
             if [ "$token" != "null" ] && [ -n "$token" ]; then
@@ -145,22 +163,6 @@ jobs:
           else
             echo "Fail: $response"
             exit 1
-          fi
-
-          echo "** Test 2: Wrong login **"
-          response=$(curl -s -X POST $localUrl \
-          -H "Content-Type: application/json" \
-          -d '{"email": "wrong@gmail.com", "password": "Abc@12345"}')
-          if echo "$response" | jq empty 2>/dev/null; then
-            token=$(echo "$response" | jq -r ".token")
-            if [ "$token" != "null" ] && [ -n "$token" ]; then
-              echo "Fail: Wrong login have a token"
-              exit 1
-            else
-              echo "Ok: $(echo "$response" | jq -r '.message // "unexpected response"')"
-            fi
-          else
-            echo "Ok: $response"
           fi
 
           echo "** Test 3: Wrong Password **"
