@@ -101,23 +101,22 @@ jobs:
           node server.js &
           sleep 5
 
-      - name: Wait for app to be ready ⏱️
-        run: |
-          for i in {1..20}; do
-            if curl -s http://localhost:4500/test >/dev/null 2>&1; then
-              echo "✅ App is ready!"
-              exit 0
-            fi
-            echo "⏳ Waiting for app..."
-            sleep 4
-          done
-          echo "❌ App failed to start"
-          exit 1
 
       - name: Initialize local DB 🚀
         run: |
-          curl http://localhost:4500/initialize
-          sleep 5
+          nohup node server.js &> server.log &
+          PID=$!
+          echo "Node PID: $PID"
+          # Wait until /test returns 200
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4500/test || true)
+            if [ "$STATUS" == "200" ]; then
+              echo "✅ API ready"
+              break
+            fi
+            echo "Waiting for API..."
+            sleep 2
+          done
 
           
       - name: Run login API tests 📝
