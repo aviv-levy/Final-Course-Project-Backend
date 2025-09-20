@@ -29,6 +29,86 @@ permissions:
   contents: read
 
 jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    name: "Test image before pushing"
+
+    steps:
+      - name: Checkout repository 📂
+        uses: actions/checkout@v4 
+
+
+      - name: Create .env file from secrets
+        run: |
+          echo "🔧 Creating environment file..."
+          echo "${{ secrets.AWS_PRODUCTION }}" > .env
+          echo "✅ Environment file created successfully!"
+
+
+      - name: Build image
+        run: docker build -t test-image .
+
+      - name: Run mongo container
+        run: |
+          docker run -d \
+          --name test-mongo \
+          -p 27017:27017 \
+          mongo:6
+
+      - name: Run backend container
+        run: |
+          docker run -d \
+          --name test-backend \
+          --network host \
+          test-image
+
+
+      - name: Initialize mongo
+        run: |
+          # check if containers are running
+          if ! docker ps | grep test-mongo &>/dev/null; then
+            echo "Mongo container failed to start.. Generating logs"
+            docker logs test-mongo
+            docker inspect test-mongo
+            exit 1
+          fi
+
+          if ! docker ps | grep test-backend &>/dev/null; then
+            echo "backend container failed to start.. Generating logs"
+            docker logs test-backend
+            docker inspect test-backend
+            exit 1
+          fi
+
+          # intialize mongo
+          curl http://localhost:4500/initialize
+
+      - name: Run API tests
+        run: |
+          # start backend container if failed
+          if docker ps | grep test-backend &>/dev/null; then
+            echo "Starting API tests"
+            ./testing/loginRouterTesting.sh http://localhost:4500/login
+          else
+            docker start test-backend
+            MAX_RETRIES=10
+            echo "Waiting for test-backend container to be ready"
+
+            for ((i=1; i<=MAX_RETRIES; i++)); do
+              if curl -s http://localhost:4500/test >/dev/null; then
+                echo "test-backend container is Ready"
+                echo "Starting API tests"
+                ./testing/loginRouterTesting.sh http://localhost:4500/login
+                break
+              fi
+              sleep 1
+            done
+
+            echo "Container did not respond on localhost:4500/test after $MAX_RETRIES retries."
+            exit 1 
+          
+          
+
   build-and-push:
     runs-on: ubuntu-latest
     environment: ENV
@@ -191,11 +271,11 @@ jobs:
       - name: run login API test on EKS
         run: |
           echo "Checking if LoadBalancer is ready..."
-          for i in {1..15}; do
+          for i in {1..20}; do
             LB=$(kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true)
             if [ -n "$LB" ]; then break; fi
-              echo "Waiting for LoadBalancer..."
-              sleep 10
+            echo "Waiting for LoadBalancer..."
+            sleep 10
           done
           if [ -z "$LB" ]; then
             echo "Fail: LoadBalancer hostname not available"
@@ -203,62 +283,10 @@ jobs:
           fi
 
           echo "✅ LoadBalancer is ready"
-          API_URL="http://$LB/login"
+          SERVER_URL="http://$LB/login"
 
-          echo "** Test 1: Correct login **"
-          response=$(curl -s -X POST "$API_URL" \
-          -H "Content-Type: application/json" \
-          -d "${{ secrets.MONGO_TEST_USER }}")
-          if echo "$response" | jq empty 2>/dev/null; then
-            token=$(echo "$response" | jq -r ".token")
-            if [ "$token" != "null" ] && [ -n "$token" ]; then
-              echo "Ok: User successfully logged-in"
-            else
-              error_msg=$(echo "$response" | jq -r '.message // empty')
-              if [ -n "$error_msg" ]; then
-                echo "Fail: $error_msg"
-                exit 1
-              else
-                echo "Fail: unexpected response"
-                exit 1
-              fi
-            fi
-          else
-            echo "Fail: $response"
-            exit 1
-          fi
-
-          echo "** Test 2: Wrong login **"
-          response=$(curl -s -X POST "$API_URL" \
-          -H "Content-Type: application/json" \
-          -d '{"email": "wrong@gmail.com", "password": "Abc@12345"}')
-          if echo "$response" | jq empty 2>/dev/null; then
-            token=$(echo "$response" | jq -r ".token")
-            if [ "$token" != "null" ] && [ -n "$token" ]; then
-              echo "Fail: Wrong login have a token"
-              exit 1
-            else
-              echo "Ok: $(echo "$response" | jq -r '.message // "unexpected response"')"
-            fi
-          else
-            echo "Ok: $response"
-          fi
-
-          echo "** Test 3: Wrong Password **"
-          response=$(curl -s -X POST "$API_URL" \
-          -H "Content-Type: application/json" \
-          -d '{"email": "nir@gmail.com", "password": "Abc@12345"}')
-          if echo "$response" | jq empty 2>/dev/null; then
-            token=$(echo "$response" | jq -r ".token")
-            if [ "$token" != "null" ] && [ -n "$token" ]; then
-              echo "Fail: Wrong password have a token"
-              exit 1
-            else
-              echo "Ok: $(echo "$response" | jq -r '.message // "unexpected response"')"
-            fi
-          else
-            echo "Ok: $response"
-          fi 
+          echo "Starting API test on EKS"
+          ./testing/loginRouterTesting.sh $SERVER_URL
 
      
 
