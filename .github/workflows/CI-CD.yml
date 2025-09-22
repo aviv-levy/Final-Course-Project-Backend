@@ -121,7 +121,7 @@ jobs:
       - name: Run login API tests
         run: |
           echo "Starting login API tests..."
-          ./testing/loginRouterTesting.sh "$TESTING_URL" ${{ secrets.MONGO_TEST_USER }}
+          ./testing/loginRouterTesting.sh "$TESTING_URL" '${{ secrets.MONGO_TEST_USER }}'
 
 
 
