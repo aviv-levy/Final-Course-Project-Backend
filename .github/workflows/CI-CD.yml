@@ -29,8 +29,104 @@ permissions:
   contents: read
 
 jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      TESTING_URL: "http://localhost:4500/login"
+    name: "Test image before pushing"
+
+    steps:
+      - name: Checkout repository 📂
+        uses: actions/checkout@v4
+
+      - name: Create .env file from secrets
+        run: |
+          echo "🔧 Creating environment file..."
+          echo "${{ secrets.AWS_PRODUCTION }}" > .env
+          echo "✅ Environment file created successfully!"
+
+      # change the DATABASE in .env for the containers
+      - name: Change DATABASE Url 
+        run: sed -i 's|^DATABASE *=.*|DATABASE="mongodb://test-mongo:27017/Final-Course-Project"|' .env; cat .env
+
+      - name: Build image
+        run: docker build -t test-local .
+
+      - name: Create docker network
+        run: docker network create test-net || true
+
+      - name: Run mongo container
+        run: |
+          docker run -d \
+          --name test-mongo \
+          --network test-net \
+          mongo:6
+
+      - name: Run backend container
+        run: |
+          docker run -d \
+          --name test-backend \
+          --network test-net \
+          -p 4500:4500 \
+          test-local
+
+
+      - name: Initialize mongoDB
+        run: | 
+          for i in {1..10}; do
+            if docker logs test-backend 2>&1 | grep -q "Connected to Mongo"; then
+              echo "✅ Backend successfully connected to Mongo... Initializing data"
+              curl http://localhost:4500/initialize
+              exit 0
+            fi
+            echo "⏳ Waiting for backend to connect to Mongo..."
+            sleep 2
+          done
+          echo "❌ Backend failed to connect to Mongo"
+          docker logs test-backend
+          exit 1
+
+
+      - name: Check if backend container failed
+        run: |
+          sleep 10
+          if docker ps | grep test-backend &>/dev/null; then
+            echo "Backend container is still running"
+          else
+            echo "Backend failed... trying to restart it"
+            docker restart test-backend
+
+            for i in {1..10}; do
+            if docker logs test-backend 2>&1 | grep -q "Connected to Mongo"; then
+              echo "✅ Backend successfully connected to Mongo!"
+              exit 0
+            fi
+            echo "⏳ Waiting for backend to connect to Mongo..."
+            sleep 3
+          done
+          echo "❌ Backend failed to connect to Mongo"
+          docker logs test-backend
+          exit 1
+            
+
+
+          
+
+
+      - name: Run login API tests
+        run: |
+          echo "Starting login API tests..."
+          ./testing/loginRouterTesting.sh "$TESTING_URL" "${{ secrets.MONGO_TEST_USER }}"
+
+
+
+
+
+
+
   build-and-push:
     runs-on: ubuntu-latest
+    needs: build-and-test
     environment: ENV
     name: "🎯 Build Image on runner"
 
