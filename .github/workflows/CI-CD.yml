@@ -42,9 +42,8 @@ jobs:
       - name: Create .env file from secrets
         run: |
           echo "🔧 Creating environment file..."
-          printf "%s" "${{ secrets.AWS_PRODUCTION }}" > .env
+          echo "${{ secrets.AWS_PRODUCTION }}" > .env
           echo "✅ Environment file created successfully!"
-          cat .env
 
       # change the DATABASE in .env for the containers
       - name: Change DATABASE Url 
