@@ -31,6 +31,7 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    environment: ENV
     env:
       TESTING_URL: "http://localhost:4500/login"
     name: "Test image before pushing"
