@@ -9,12 +9,13 @@ fi
 
 
 URL="$1"
+DATA="$2"
 FAILS=0
 
 echo "** Test 1: Correct login **"
 response=$(curl -s -X POST $URL \
 -H "Content-Type: application/json" \
--d "${{ secrets.MONGO_TEST_USER }}")
+-d "$DATA")
 
 # check if response is valid JSON:
 if echo "$response" | jq empty 2>/dev/null; then
