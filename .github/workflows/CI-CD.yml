@@ -48,7 +48,7 @@ jobs:
 
       # change the DATABASE in .env for the containers
       - name: Change DATABASE Url 
-        run: sed -i 's|^DATABASE *=.*|DATABASE="mongodb://test-mongo:27017/Final-Course-Project"|' .env; cat .env
+        run: sed -i 's|^DATABASE *=.*|DATABASE="mongodb://test-mongo:27017/Final-Course-Project"|' .env
 
       - name: Build image
         run: docker build -t test-local .
