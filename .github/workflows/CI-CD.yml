@@ -86,7 +86,7 @@ jobs:
           docker run -d -p 8080:4500 --name freestyle-test ${{ steps.build-image.outputs.image }}
           echo "⏳ Waiting for container to be ready..."
           for i in {1..10}; do
-              RESPONSE=$(curl -s http://localhost:8080/test3 || true)
+              RESPONSE=$(curl -s http://localhost:8080/test || true)
               if echo "$RESPONSE" | grep -q "test passed"; then
               echo "✅ Test passed!"
               break
@@ -95,7 +95,7 @@ jobs:
             sleep 5
           done
 
-          RESPONSE=$(curl -s http://localhost:8080/test3 || true)
+          RESPONSE=$(curl -s http://localhost:8080/test || true)
           if ! echo "$RESPONSE" | grep -q "test passed"; then
             echo "❌ Test failed!"
             echo "Response was:"
