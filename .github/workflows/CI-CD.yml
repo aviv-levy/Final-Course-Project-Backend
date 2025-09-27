@@ -86,16 +86,20 @@ jobs:
           docker run -d -p 8080:4500 --name freestyle-test ${{ steps.build-image.outputs.image }}
           echo "⏳ Waiting for container to be ready..."
           for i in {1..10}; do
-              if curl -s http://localhost:8080/test3 > /dev/null; then
-              echo "✅ Healthcheck passed!"
+              RESPONSE=$(curl -s http://localhost:8080/test3 || true)
+              if echo "$RESPONSE" | grep -q "test passed"; then
+              echo "✅ Test passed!"
               break
             fi
-            echo "🔄 Waiting for container..."
+            echo "🔄 Attempt $i: waiting for container..."
             sleep 5
           done
 
-          if ! curl -s http://localhost:8080/test > /dev/null; then
-            echo "❌ Healthcheck failed!"
+          RESPONSE=$(curl -s http://localhost:8080/test3 || true)
+          if ! echo "$RESPONSE" | grep -q "test passed"; then
+            echo "❌ Test failed!"
+            echo "Response was:"
+            echo "$RESPONSE"
             docker logs freestyle-test || true
             exit 1
           fi
