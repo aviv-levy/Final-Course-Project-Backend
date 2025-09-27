@@ -134,7 +134,7 @@ jobs:
 # apply the deploy
 
       - name: Apply manifests 🚀
-        working-directory: ./Kubernetes
+        working-directory: /Kubernetes
         run: |
           kubectl apply -f Deployment.yml
 
