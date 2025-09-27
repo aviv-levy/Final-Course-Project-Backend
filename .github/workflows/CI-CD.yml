@@ -110,40 +110,12 @@ jobs:
         run: |
           kubectl get ns "$EKS_NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$EKS_NAMESPACE"
 
-# Deployment file configuration
-      - name: Render Kubernetes manifests 📄
-        env:
-          IMAGE: ${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build-and-push.outputs.image_tag }}
-        run: |
-          cat > k8s.yaml <<EOF
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: ${APP_NAME}
-            namespace: ${EKS_NAMESPACE}
-            labels:
-              app: ${APP_NAME}
-          spec:
-            type: LoadBalancer
-            selector:
-              app: ${APP_NAME}
-            ports:
-              - name: http
-                port: 80
-                targetPort: 4500
-          EOF
-
-
 # apply the deploy
-
       - name: Apply manifests 🚀
         working-directory: ./Kubernetes
         run: |
           kubectl apply -f Deployment.yml
-
-      - name: Apply manifests 🚀
-        run: |
-          kubectl apply -f k8s.yaml
+          kubectl apply -f elb.yml
 
       - name: Wait for rollout ⏱️
         run: |
