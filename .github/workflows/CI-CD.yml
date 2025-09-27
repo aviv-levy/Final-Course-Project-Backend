@@ -106,12 +106,15 @@ jobs:
         
       - name: Push Docker image to ECR ⬆️
         id: push-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          UNIQUE_TAG: ${{ steps.generate-tag.outputs.UNIQUE_TAG }}
         run: |
           echo "⬆️ Pushing image with unique tag to ECR..."
           docker push ${{ steps.build-image.outputs.image }}
 
           echo "⬆️ Pushing latest tag (moves latest to this image)..."
-          docker push ${{ steps.build-image.outputs.image }}:latest
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
           
           echo "✅ Image pushed successfully with tag: ${{ steps.generate-tag.outputs.UNIQUE_TAG }}"
 
