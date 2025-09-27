@@ -113,37 +113,6 @@ jobs:
           IMAGE: ${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build-and-push.outputs.image_tag }}
         run: |
           cat > k8s.yaml <<EOF
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: ${APP_NAME}
-            namespace: ${EKS_NAMESPACE}
-            labels:
-              app: ${APP_NAME}
-          spec:
-            replicas: 2
-            selector:
-              matchLabels:
-                app: ${APP_NAME}
-            template:
-              metadata:
-                labels:
-                  app: ${APP_NAME}
-              spec:
-                containers:
-                  - name: ${APP_NAME}
-                    image: ${IMAGE}
-                    imagePullPolicy: Always
-                    ports:
-                      - containerPort: 4500
-                    resources:
-                      requests:
-                        cpu: "100m"
-                        memory: "128Mi"
-                      limits:
-                        cpu: "500m"
-                        memory: "512Mi"
-          ---
           apiVersion: v1
           kind: Service
           metadata:
@@ -163,6 +132,12 @@ jobs:
 
 
 # apply the deploy
+
+      - name: Apply manifests 🚀
+        working-directory: ./Kubernetes
+        run: |
+          kubectl apply -f Deployment.yml
+
       - name: Apply manifests 🚀
         run: |
           kubectl apply -f k8s.yaml
