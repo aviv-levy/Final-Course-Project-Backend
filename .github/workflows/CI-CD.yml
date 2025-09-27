@@ -179,6 +179,11 @@ jobs:
     needs: build-and-push
 
     steps:
+
+      # For the testing/
+      - name: Checkout repository 📂
+        uses: actions/checkout@v4
+
       - name: Configure AWS credentials 🔐
         uses: aws-actions/configure-aws-credentials@v4
         with:
