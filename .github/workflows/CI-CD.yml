@@ -86,7 +86,7 @@ jobs:
           docker run -d -p 8080:4500 --name freestyle-test ${{ steps.build-image.outputs.image }}
           echo "⏳ Waiting for container to be ready..."
           for i in {1..10}; do
-              if curl -s http://localhost:8080/test > /dev/null; then
+              if curl -s http://localhost:8080/test3 > /dev/null; then
               echo "✅ Healthcheck passed!"
               break
             fi
