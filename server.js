@@ -71,6 +71,14 @@ app.get('/test', (req,res) =>{
 
 })
 
+app.get('/test2', (req,res) =>{
+
+    console.log('test');
+
+    res.send('test passed');
+
+})
+
 // Initialize Database with data
 app.get('/initialize', async (req, res) => {
     try {
