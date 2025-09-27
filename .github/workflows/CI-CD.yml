@@ -83,7 +83,7 @@ jobs:
       - name: Test Docker Image 🧪
         id: test-image
         run: |
-          docker run -d -p 8080:4500 --name freestyle-test ${{ outputs.image }}
+          docker run -d -p 8080:4500 --name freestyle-test ${{ steps.build-image.outputs.image }}
           echo "⏳ Waiting for container to be ready..."
           for i in {1..10}; do
               if curl -s http://localhost:8080/test > /dev/null; then
@@ -106,17 +106,14 @@ jobs:
         
       - name: Push Docker image to ECR ⬆️
         id: push-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          UNIQUE_TAG: ${{ steps.generate-tag.outputs.UNIQUE_TAG }}
         run: |
           echo "⬆️ Pushing image with unique tag to ECR..."
-          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$UNIQUE_TAG
+          docker push ${{ steps.build-image.outputs.image }}
 
           echo "⬆️ Pushing latest tag (moves latest to this image)..."
-          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
+          docker push ${{ steps.build-image.outputs.image }}:latest
           
-          echo "✅ Image pushed successfully with tag: $UNIQUE_TAG"
+          echo "✅ Image pushed successfully with tag: ${{ steps.generate-tag.outputs.UNIQUE_TAG }}"
 
 # Deploy image to eks
   Deploy-to-eks:
