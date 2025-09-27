@@ -281,7 +281,7 @@ jobs:
               echo "✅ LoadBalancer is ready: $LB_HOST"
               
               echo "Running login API tests against LoadBalancer..."
-              ./testing/loginRouterTesting.sh "http://$LB_HOST/login" '${{ secrets.MONGO_TEST_USER }}'
+              ./testing/loginRouterTesting.sh "http://$LB_HOST/login" ${{ secrets.MONGO_TEST_USER }}
               
             fi
             echo "⏳ LoadBalancer not ready yet, retrying... ($i/30)"
