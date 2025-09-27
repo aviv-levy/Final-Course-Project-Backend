@@ -37,6 +37,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.generate-tag.outputs.UNIQUE_TAG }}
       ecr_registry: ${{ steps.login-ecr.outputs.registry }}
+      image: ${{ steps.build-image.outputs.IMAGE }}
 
     steps:
       - name: Checkout repository 📂
@@ -65,7 +66,7 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           echo "UNIQUE_TAG=${{ env.APP_NAME }}-${BUILD_NUMBER}-${TIMESTAMP}" >> $GITHUB_OUTPUT
 
-      - name: Build and push Docker image 🏗️
+      - name: Build Docker image 🏗️
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -77,6 +78,38 @@ jobs:
             -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$UNIQUE_TAG \
             -t "$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest" \
             .
+          echo "IMAGE=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$UNIQUE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Test Docker Image 🧪
+        id: test-image
+        run: |
+          docker run -d -p 8080:4500 --name freestyle-test ${{ outputs.image }}
+          echo "⏳ Waiting for container to be ready..."
+          for i in {1..10}; do
+              if curl -s http://localhost:8080/test > /dev/null; then
+              echo "✅ Healthcheck passed!"
+              break
+            fi
+            echo "🔄 Waiting for container..."
+            sleep 5
+          done
+
+          if ! curl -s http://localhost:8080/test > /dev/null; then
+            echo "❌ Healthcheck failed!"
+            docker logs freestyle-test || true
+            exit 1
+          fi
+
+          echo "🛑 Stopping container after test..."
+          docker stop freestyle-test
+          
+        
+      - name: Push Docker image to ECR ⬆️
+        id: push-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          UNIQUE_TAG: ${{ steps.generate-tag.outputs.UNIQUE_TAG }}
+        run: |
           echo "⬆️ Pushing image with unique tag to ECR..."
           docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$UNIQUE_TAG
 
