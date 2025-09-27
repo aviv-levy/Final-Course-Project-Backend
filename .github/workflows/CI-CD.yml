@@ -73,9 +73,16 @@ jobs:
         run: |
           echo "🔨 Starting Docker build..."
           echo "🔍 Build triggered by: ${{ github.event_name }}"
-          docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$UNIQUE_TAG .
-          echo "⬆️ Pushing image to ECR..."
+          docker build \
+            -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$UNIQUE_TAG \
+            -t "$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest" \
+            .
+          echo "⬆️ Pushing image with unique tag to ECR..."
           docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$UNIQUE_TAG
+
+          echo "⬆️ Pushing latest tag (moves latest to this image)..."
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
+          
           echo "✅ Image pushed successfully with tag: $UNIQUE_TAG"
 
 # Deploy image to eks
