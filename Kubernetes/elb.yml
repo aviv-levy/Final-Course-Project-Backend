@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: freestyle-api
+  namespace: freestyle
+  labels:
+    app: freestyle-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: freestyle-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 4500
