@@ -27,16 +27,16 @@ if echo "$response" | jq empty 2>/dev/null; then
     error_msg=$(echo "$response" | jq -r '.message // empty')
     if [ -n "$error_msg" ]; then
       echo "Fail: $error_msg"
-      FAIL=$((FAIL + 1))
+      FAILS=$((FAILS + 1))
     else
       echo "Fail: unexpected response"
-      FAIL=$((FAIL + 1))
+      FAILS=$((FAILS + 1))
     fi
   fi
 else
   # response is not JSON
   echo "Fail: $response"
-  FAIL=$((FAIL + 1))
+  FAILS=$((FAILS + 1))
 fi
 
 
@@ -50,7 +50,7 @@ if echo "$response" | jq empty 2>/dev/null; then
   token=$(echo "$response" | jq -r ".token")
   if [ "$token" != "null" ] && [ -n "$token" ]; then
     echo "Fail: Wrong login have a token"
-    FAIL=$((FAIL + 1))
+    FAILS=$((FAILS + 1))
   else
     # get only the error message from the response
     error_msg=$(echo "$response" | jq -r '.message // empty')
@@ -76,7 +76,7 @@ if echo "$response" | jq empty 2>/dev/null; then
   token=$(echo "$response" | jq -r ".token")
   if [ "$token" != "null" ] && [ -n "$token" ]; then
     echo "Fail: Wrong password have a token"
-    FAIL=$((FAIL + 1))
+    FAILS=$((FAILS + 1))
   else
     #  get only the error message from the response
     error_msg=$(echo "$response" | jq -r ".message // empty")
@@ -92,7 +92,7 @@ else
 fi
 
 # Exit with failure if any test failed
-if [ "$FAIL" -ge 1 ]; then
+if [ "$FAILS" -ge 1 ]; then
   exit 1
 else
   exit 0
