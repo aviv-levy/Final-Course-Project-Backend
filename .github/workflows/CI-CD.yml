@@ -280,6 +280,8 @@ jobs:
             LB_HOST=$(kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true)
             if [ -n "$LB_HOST" ]; then
               echo "✅ LoadBalancer is ready: $LB_HOST"
+
+              curl http://$LB_HOST/test
               
               echo "Running login API tests against LoadBalancer..."
               ./testing/loginRouterTesting.sh "http://$LB_HOST/login" '${{ secrets.MONGO_TEST_USER }}'
