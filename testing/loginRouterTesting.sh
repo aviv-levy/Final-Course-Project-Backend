@@ -1,8 +1,12 @@
 #!/bin/bash
 
-# Check if a URL parameter was provided
 if [ -z "$1" ]; then
   echo "No URL provided"
+  exit 1
+fi
+
+if [ -z "$2" ]; then
+  echo "No DATA provided"
   exit 1
 fi
 
@@ -13,7 +17,7 @@ DATA="$2"
 FAILS=0
 
 echo "** Test 1: Correct login **"
-response=$(curl -s -X POST $URL \
+response=$(curl -s -X POST "$URL" \
 -H "Content-Type: application/json" \
 -d "$DATA")
 
@@ -41,7 +45,7 @@ fi
 
 
 echo "** Test 2: Wrong login **"
-response=$(curl -s -X POST $URL \
+response=$(curl -s -X POST "$URL" \
 -H "Content-Type: application/json" \
 -d '{"email": "wrong@gmail.com", "password": "Abc@12345"}')
 
@@ -67,7 +71,7 @@ fi
 
 
 echo "** Test 3: Wrong Password **"
-response=$(curl -s -X POST $URL \
+response=$(curl -s -X POST "$URL" \
 -H "Content-Type: application/json" \
 -d '{"email": "nir@gmail.com", "password": "Abc@12345"}')
 
