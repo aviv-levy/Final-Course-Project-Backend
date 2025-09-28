@@ -275,23 +275,24 @@ jobs:
 
       - name: Wait for LoadBalancer and run login API tests 🌐
         run: |
-          echo "Waiting for LoadBalancer hostname..."
-          for i in {1..10}; do
-            LB_HOST=$(kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true)
-            if [ -n "$LB_HOST" ]; then
+           echo "Waiting for LoadBalancer hostname..."
+           for i in {1..10}; do
+             LB_HOST=$(kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true)
+             if [ -n "$LB_HOST" ]; then
               echo "✅ LoadBalancer is ready: $LB_HOST"
+              break
+             fi
+             echo "⏳ LoadBalancer not ready yet, retrying... ($i/10)"
+             sleep 10
+           done
 
-              curl http://$LB_HOST/test
-              
-              echo "Running login API tests against LoadBalancer..."
-              ./testing/loginRouterTesting.sh "http://$LB_HOST/login" '${{ secrets.MONGO_TEST_USER }}'
-              
-            fi
-            echo "⏳ LoadBalancer not ready yet, retrying... ($i/30)"
-            sleep 10
-          done
-          echo "❌ LoadBalancer did not get an external hostname in time"
-          exit 1
+           if [ -n "$LB_HOST" ]; then
+             echo "Starting API login tests on LB..."
+             ./testing/loginRouterTesting.sh "http://$LB_HOST/login" "${{ secrets.MONGO_TEST_USER }}"
+           else
+             echo "❌ LB failed to launch"
+             exit 1
+           fi
 
       - name: Diagnostics on failure 🧪
         if: failure()
