@@ -273,6 +273,8 @@ jobs:
           echo
 
       - name: Wait for LoadBalancer and run login API tests 🌐
+        env:
+          TEST_USER: ${{ secrets.MONGO_TEST_USER }}
         run: |
           echo "Waiting for LoadBalancer hostname..."
           for i in {1..30}; do
@@ -281,7 +283,7 @@ jobs:
               echo "✅ LoadBalancer is ready: $LB_HOST"
               
               echo "Running login API tests against LoadBalancer..."
-              ./testing/loginRouterTesting.sh "http://$LB_HOST/login" ${{ secrets.MONGO_TEST_USER }}
+              ./testing/loginRouterTesting.sh "http://$LB_HOST/login" "$TEST_USER"
               
             fi
             echo "⏳ LoadBalancer not ready yet, retrying... ($i/30)"
