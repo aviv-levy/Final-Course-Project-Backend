@@ -288,7 +288,7 @@ jobs:
 
            if [ -n "$LB_HOST" ]; then
              echo "Starting API login tests on LB..."
-             ./testing/loginRouterTesting.sh "http://$LB_HOST/login" "${{ secrets.MONGO_TEST_USER }}"
+             ./testing/loginRouterTesting.sh "http://$LB_HOST/login" '${{ secrets.MONGO_TEST_USER }}'
            else
              echo "❌ LB failed to launch"
              exit 1
