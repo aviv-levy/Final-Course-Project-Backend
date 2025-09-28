@@ -175,6 +175,7 @@ jobs:
 # Deploy image to eks
   Deploy-to-eks:
     runs-on: ubuntu-latest
+    environment: ENV
     name: "🎯 Deploy image to eks"
     needs: build-and-push
 
@@ -273,17 +274,15 @@ jobs:
           echo
 
       - name: Wait for LoadBalancer and run login API tests 🌐
-        env:
-          TEST_USER: ${{ secrets.MONGO_TEST_USER }}
         run: |
           echo "Waiting for LoadBalancer hostname..."
-          for i in {1..30}; do
+          for i in {1..10}; do
             LB_HOST=$(kubectl get svc ${APP_NAME} -n ${EKS_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true)
             if [ -n "$LB_HOST" ]; then
               echo "✅ LoadBalancer is ready: $LB_HOST"
               
               echo "Running login API tests against LoadBalancer..."
-              ./testing/loginRouterTesting.sh "http://$LB_HOST/login" "$TEST_USER"
+              ./testing/loginRouterTesting.sh "http://$LB_HOST/login" '${{ secrets.MONGO_TEST_USER }}'
               
             fi
             echo "⏳ LoadBalancer not ready yet, retrying... ($i/30)"
