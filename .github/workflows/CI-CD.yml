@@ -32,7 +32,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     environment: ENV
-    name: "🎯 Build Image on runner"
+    name: "🎯 Build And Push Image To ECR "
 
     outputs:
       image_tag: ${{ steps.generate-tag.outputs.UNIQUE_TAG }}
@@ -162,7 +162,7 @@ jobs:
 
       - name: Add Splunk to new deployment
         run: |
-            kubectl patch namespace $EKS_CLUSTER_NAME -p '{"metadata":{"annotations":{"instrumentation.opentelemetry.io/inject-nodejs":"default/splunk-otel-collector"}}}'
+            kubectl patch namespace ${EKS_NAMESPACE} -p '{"metadata":{"annotations":{"instrumentation.opentelemetry.io/inject-nodejs":"default/splunk-otel-collector"}}}'
 
       - name: Show service endpoint 🌐
         run: |
