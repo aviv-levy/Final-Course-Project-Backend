@@ -1,8 +1,8 @@
 name: FreeStyle Final Project CI-CD
 
 on:
-  #push:
-    #branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
@@ -159,6 +159,10 @@ jobs:
           kubectl rollout status deploy/${APP_NAME} -n ${EKS_NAMESPACE} --timeout=300s
           echo "Deployed image:"
           echo "${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build-and-push.outputs.image_tag }}"
+
+      - name: Add Splunk to new deployment
+        run: |
+            kubectl patch namespace $EKS_CLUSTER_NAME -p '{"metadata":{"annotations":{"instrumentation.opentelemetry.io/inject-nodejs":"default/splunk-otel-collector"}}}'
 
       - name: Show service endpoint 🌐
         run: |
